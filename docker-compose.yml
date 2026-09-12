@@ -1,0 +1,107 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: tuition-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db-init/init-multiple-dbs.sh:/docker-entrypoint-initdb.d/init-multiple-dbs.sh
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  auth-service:
+    build: ./services/auth-service
+    container_name: auth-service
+    environment:
+      PORT: 3001
+      JWT_SECRET: dev_secret_change_me
+      ACCOUNT_SERVICE_URL: http://account-service:3002
+    ports:
+      - "3001:3001"
+    depends_on:
+      - account-service
+
+  account-service:
+    build: ./services/account-service
+    container_name: account-service
+    environment:
+      PORT: 3002
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/account_db
+    ports:
+      - "3002:3002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  tuition-service:
+    build: ./services/tuition-service
+    container_name: tuition-service
+    environment:
+      PORT: 3003
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/tuition_db
+    ports:
+      - "3003:3003"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  otp-service:
+    build: ./services/otp-service
+    container_name: otp-service
+    environment:
+      PORT: 3005
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/otp_db
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+    ports:
+      - "3005:3005"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  payment-service:
+    build: ./services/payment-service
+    container_name: payment-service
+    environment:
+      PORT: 3004
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/payment_db
+      ACCOUNT_SERVICE_URL: http://account-service:3002
+      TUITION_SERVICE_URL: http://tuition-service:3003
+      OTP_SERVICE_URL: http://otp-service:3005
+    ports:
+      - "3004:3004"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api-gateway:
+    build: ./api-gateway
+    container_name: api-gateway
+    environment:
+      PORT: 8080
+      JWT_SECRET: dev_secret_change_me
+      AUTH_SERVICE_URL: http://auth-service:3001
+      ACCOUNT_SERVICE_URL: http://account-service:3002
+      TUITION_SERVICE_URL: http://tuition-service:3003
+      PAYMENT_SERVICE_URL: http://payment-service:3004
+    ports:
+      - "8080:8080"
+    depends_on:
+      - auth-service
+      - account-service
+      - tuition-service
+      - payment-service
+
+volumes:
+  pgdata:

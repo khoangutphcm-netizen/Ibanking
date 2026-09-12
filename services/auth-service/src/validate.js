@@ -1,0 +1,13 @@
+// Middleware validate chung, dùng cho mọi service — parse & trả lỗi 400 rõ ràng nếu input sai.
+function validate(schema, source = "body") {
+  return (req, res, next) => {
+    const result = schema.safeParse(req[source]);
+    if (!result.success) {
+      const message = result.error.errors.map((e) => e.message).join("; ");
+      return res.status(400).json({ error: message });
+    }
+    req[source] = result.data;
+    next();
+  };
+}
+module.exports = validate;

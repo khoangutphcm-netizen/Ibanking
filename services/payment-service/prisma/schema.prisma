@@ -1,0 +1,22 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Transaction {
+  id              Int       @id @default(autoincrement())
+  transactionCode String    @unique @map("transaction_code") // idempotency key
+  payerUserId     Int       @map("payer_user_id")
+  payerEmail      String    @map("payer_email")
+  mssv            String
+  amount          Decimal   @db.Decimal(14, 2)
+  status          String    @default("pending_otp") // pending_otp | success | failed | expired
+  createdAt       DateTime  @default(now()) @map("created_at")
+  completedAt     DateTime? @map("completed_at")
+
+  @@map("transactions")
+}

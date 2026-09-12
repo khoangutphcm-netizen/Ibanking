@@ -1,0 +1,21 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model TuitionFee {
+  id          Int      @id @default(autoincrement())
+  mssv        String   @unique
+  studentName String   @map("student_name")
+  amount      Decimal  @db.Decimal(14, 2)
+  semester    String
+  status      String   @default("unpaid") // unpaid | paid
+  version     Int      @default(0) // optimistic locking
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("tuition_fees")
+}
